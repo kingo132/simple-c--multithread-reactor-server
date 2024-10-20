@@ -52,7 +52,7 @@ std::vector<BindInfo> parse_bind_file(const std::string& bind_file_path) {
 
 // Server constructor
 Server::Server(size_t queue_size, int num_workers, dll_func_t* dll_funcs)
-    : queue_(queue_size), num_workers_(num_workers), stop_flag_(false), dll_functions_(dll_funcs) {
+    : recv_queue_(queue_size), send_queue_(queue_size), num_workers_(num_workers), stop_flag_(false), dll_functions_(dll_funcs) {
 #ifdef USE_EPOLL
     dispatcher_ = new EpollDispatcher();
 #else
@@ -180,7 +180,8 @@ void Server::network_thread_func() {
         QueueBlock block;
         size_t actual_length;
 
-        if (queue_.wait_and_pop(buffer, sizeof(buffer), actual_length, block, std::chrono::milliseconds(100))) {
+        // Pop data from the send queue to send to clients
+        if (send_queue_.wait_and_pop(buffer, sizeof(buffer), actual_length, block, std::chrono::milliseconds(100))) {
             ClientInfo* client = client_manager_.get_client(block.socket_info.sock_fd);
             if (!client) {
                 LOG_ERR("Failed to get client fd: %d", block.socket_info.sock_fd);
@@ -225,7 +226,8 @@ void Server::worker_thread_func(int worker_id) {
         QueueBlock block;
         size_t actual_length;
 
-        if (queue_.wait_and_pop(buffer, sizeof(buffer), actual_length, block, std::chrono::milliseconds(100))) {
+        // Pop data from the receive queue to process
+        if (recv_queue_.wait_and_pop(buffer, sizeof(buffer), actual_length, block, std::chrono::milliseconds(100))) {
             char* send_data = nullptr;
             int send_data_len = 0;
 
@@ -238,7 +240,8 @@ void Server::worker_thread_func(int worker_id) {
                 response_block.type = BlockType::Data;
                 response_block.total_length = send_data_len + sizeof(QueueBlock);
 
-                queue_.push(send_data, send_data_len, response_block);
+                // Push processed data to the send queue
+                send_queue_.push(send_data, send_data_len, response_block);
                 LOG_DEBUG("Processed data for client fd: %d", block.socket_info.sock_fd);
             }
 
@@ -248,7 +251,7 @@ void Server::worker_thread_func(int worker_id) {
                 final_block.socket_info = block.socket_info;
                 final_block.type = BlockType::Final;
                 final_block.total_length = sizeof(QueueBlock);
-                queue_.push(nullptr, 0, final_block);
+                send_queue_.push(nullptr, 0, final_block);
                 LOG_WARN("Error processing data, pushing final block for fd: %d", block.socket_info.sock_fd);
             }
         }
@@ -282,6 +285,15 @@ void Server::handle_client_data(int fd, bool is_readable) {
         int recv_result = (int) protocol_handler->receive_data(*client, dll_functions_);
         if (recv_result < 0) {
             LOG_ERR("Failed to receive data from client fd: %d", fd);
+        } else {
+            // Push received data to the receive queue for workers to process
+            QueueBlock recv_block;
+            recv_block.accept_fd = client->socket_info.sock_fd;
+            recv_block.socket_info = client->socket_info;
+            recv_block.type = BlockType::Data;
+            recv_block.total_length = recv_result;
+
+            recv_queue_.push(client->recv_buffer, recv_result, recv_block);
         }
     }
 }

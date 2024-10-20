@@ -31,7 +31,8 @@ public:
     void stop();
 
 private:
-    RingQueue queue_; // Message queue
+    RingQueue recv_queue_; // Receive queue (network thread -> worker threads)
+    RingQueue send_queue_; // Send queue (worker threads -> network thread)
     int num_workers_; // Number of worker threads
     std::atomic<bool> stop_flag_; // Flag to stop server
     std::thread network_thread_; // Thread handling network events
