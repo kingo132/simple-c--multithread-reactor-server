@@ -2,6 +2,8 @@
 #include <iostream>
 #include <ctime>
 #include <cstdarg>
+#include <iomanip>
+#include <sstream>
 
 LogManager::LogManager(const std::string& log_dir, int log_level, int max_log_files, int max_log_size, LogDestination destination)
     : log_directory_(log_dir), log_level_(log_level), max_log_files_(max_log_files), max_log_size_(max_log_size),
@@ -58,8 +60,18 @@ void LogManager::rotate_log_files() {
         log_file_.close();
     }
 
+    std::time_t t = std::time(nullptr);
+    std::tm local_tm = *std::localtime(&t);
+
+    // log_YYYYMMDD_HHMM_index.txt
+    std::ostringstream oss;
+    oss << log_directory_ << "/log_"
+        << std::put_time(&local_tm, "%Y%m%d_%H%M") << "_"
+        << log_file_index_ << ".txt";
+
     log_file_index_ = (log_file_index_ % max_log_files_) + 1;
-    std::string log_filename = log_directory_ + "/log_" + std::to_string(log_file_index_) + ".txt";
-    log_file_.open(log_filename, std::ios::out | std::ios::trunc);
+    std::string log_filename = oss.str();
+
+    log_file_.open(log_filename, std::ios::out | std::ios::app);
     current_log_size_ = 0;
 }
