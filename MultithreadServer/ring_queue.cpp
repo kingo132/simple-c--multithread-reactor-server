@@ -15,7 +15,7 @@ RingQueue::~RingQueue() {
 
 // Get the remaining space in the ring queue
 size_t RingQueue::get_free_space() const {
-    size_t current_write = write_index_.load(std::memory_order_relaxed);
+    size_t current_write = write_index_.load(std::memory_order_acquire);
     size_t current_read = read_index_.load(std::memory_order_acquire);
     if (current_write >= current_read) {
         return buffer_size_ - (current_write - current_read);
@@ -26,7 +26,7 @@ size_t RingQueue::get_free_space() const {
 
 // Get the used space in the queue
 size_t RingQueue::get_used_space() const {
-    size_t current_write = write_index_.load(std::memory_order_relaxed);
+    size_t current_write = write_index_.load(std::memory_order_acquire);
     size_t current_read = read_index_.load(std::memory_order_acquire);
     if (current_write >= current_read) {
         return current_write - current_read;
@@ -37,13 +37,15 @@ size_t RingQueue::get_used_space() const {
 
 // Push a data block into the queue
 bool RingQueue::push(const char* data, size_t length, const QueueBlock& block_header) {
+    std::unique_lock<std::mutex> lock(mutex_);
+
     size_t total_length = length + sizeof(QueueBlock);
 
     if (total_length > buffer_size_) {
         return false;  // Block size exceeds the entire buffer
     }
 
-    size_t current_write = write_index_.load(std::memory_order_relaxed);
+    size_t current_write = write_index_.load(std::memory_order_acquire);
     size_t free_space = get_free_space();
 
     // Check if there is enough free space
@@ -77,7 +79,6 @@ bool RingQueue::push(const char* data, size_t length, const QueueBlock& block_he
     write_index_.store(current_write + total_length, std::memory_order_release);
 
     // Notify waiting consumers that data is available
-    std::lock_guard<std::mutex> lock(mutex_);
     cond_var_.notify_one();
 
     return true;
@@ -85,8 +86,10 @@ bool RingQueue::push(const char* data, size_t length, const QueueBlock& block_he
 
 // Pop a data block from the queue
 bool RingQueue::wait_and_pop(char* data, size_t max_buffer_size, size_t& actual_length, QueueBlock& block_header, std::chrono::milliseconds timeout) {
+    std::unique_lock<std::mutex> lock(mutex_);
+
     while (true) {
-        size_t current_read = read_index_.load(std::memory_order_relaxed);
+        size_t current_read = read_index_.load(std::memory_order_acquire);
         size_t current_write = write_index_.load(std::memory_order_acquire);
 
         // If there is data to read
@@ -126,7 +129,6 @@ bool RingQueue::wait_and_pop(char* data, size_t max_buffer_size, size_t& actual_
             }
         } else {
             // If there is no data, wait
-            std::unique_lock<std::mutex> lock(mutex_);
             if (cond_var_.wait_for(lock, timeout) == std::cv_status::timeout) {
                 return false;  // Timeout
             }

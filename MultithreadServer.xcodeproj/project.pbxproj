@@ -65,6 +65,8 @@
 		96AB745C2CC4A58000ECCE18 /* tcp_handler.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = tcp_handler.h; sourceTree = "<group>"; };
 		96AB745D2CC4A58000ECCE18 /* udp_handler.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = udp_handler.h; sourceTree = "<group>"; };
 		96AB745F2CC4D14400ECCE18 /* Makefile */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.make; path = Makefile; sourceTree = "<group>"; };
+		96B9C2CD2CC4DD3800C6143C /* LICENSE */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = LICENSE; sourceTree = "<group>"; };
+		96B9C2CE2CC4DD3800C6143C /* README.md */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -81,6 +83,8 @@
 		96AB741D2CC434FC00ECCE18 = {
 			isa = PBXGroup;
 			children = (
+				96B9C2CD2CC4DD3800C6143C /* LICENSE */,
+				96B9C2CE2CC4DD3800C6143C /* README.md */,
 				96AB74282CC434FC00ECCE18 /* MultithreadServer */,
 				96AB74272CC434FC00ECCE18 /* Products */,
 			);
