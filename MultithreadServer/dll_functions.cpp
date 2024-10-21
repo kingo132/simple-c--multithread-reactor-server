@@ -4,6 +4,9 @@
 #include <iostream>
 #include <cstring>
 
+#define LOAD_FUNCTION(handle, func, symbol) \
+    func = (decltype(func))dlsym(handle, symbol)
+
 bool load_dll_functions(dll_func_t* dll_functions, const char* dll_path) {
     // Load the shared library
     dll_functions->handle = dlopen(dll_path, RTLD_NOW);
@@ -12,21 +15,23 @@ bool load_dll_functions(dll_func_t* dll_functions, const char* dll_path) {
         return false;
     }
 
-    // Clear any existing errors
-    dlerror();
-
-    // Assign function pointers from the DLL
-    dll_functions->handle_init = (int (*)(int, char**, int))dlsym(dll_functions->handle, "handle_init");
-    dll_functions->handle_input = (int (*)(const char*, int, const SocketInfo*))dlsym(dll_functions->handle, "handle_input");
-    dll_functions->handle_process = (int (*)(const char*, int, char**, int*, const SocketInfo*))dlsym(dll_functions->handle, "handle_process");
-    dll_functions->handle_open = (int (*)(char**, int*, const SocketInfo*))dlsym(dll_functions->handle, "handle_open");
-    dll_functions->handle_close = (int (*)(const SocketInfo*))dlsym(dll_functions->handle, "handle_close");
-    dll_functions->handle_timer = (int (*)(int*))dlsym(dll_functions->handle, "handle_timer");
-    dll_functions->handle_fini = (void (*)(int))dlsym(dll_functions->handle, "handle_fini");
-
-    // Check for any errors in loading symbols
-    if (dlerror() != nullptr) {
-        LOG_ERR("Failed to load function symbols from DLL");
+    // Load each function
+    LOAD_FUNCTION(dll_functions->handle, dll_functions->handle_init, "handle_init");
+    LOAD_FUNCTION(dll_functions->handle, dll_functions->handle_input, "handle_input");
+    LOAD_FUNCTION(dll_functions->handle, dll_functions->handle_process, "handle_process");
+    LOAD_FUNCTION(dll_functions->handle, dll_functions->handle_open, "handle_open");
+    LOAD_FUNCTION(dll_functions->handle, dll_functions->handle_close, "handle_close");
+    LOAD_FUNCTION(dll_functions->handle, dll_functions->handle_timer, "handle_timer");
+    LOAD_FUNCTION(dll_functions->handle, dll_functions->handle_fini, "handle_fini");
+    
+    // Check for mandatory interfaces
+    if (! dll_functions->handle_input) {
+        LOG_ERR("handle_input not implemented!");
+        unload_dll_functions(dll_functions);
+        return false;
+    }
+    if (! dll_functions->handle_process) {
+        LOG_ERR("handle_process not implemented!");
         unload_dll_functions(dll_functions);
         return false;
     }

@@ -4,6 +4,7 @@
 #include <cstdarg>
 #include <iomanip>
 #include <sstream>
+#include "utility.h"
 
 LogManager::LogManager(const std::string& log_dir, int log_level, int max_log_files, int max_log_size, LogDestination destination)
     : log_directory_(log_dir), log_level_(log_level), max_log_files_(max_log_files), max_log_size_(max_log_size),
@@ -31,7 +32,7 @@ void LogManager::log_message(LogLevel level, const char* format, ...) {
     vsnprintf(log_message, sizeof(log_message), format, args);
     va_end(args);
 
-    std::string timestamp = get_current_timestamp();
+    std::string timestamp = Utility::get_current_timestamp_string();
     std::string full_message = "[" + timestamp + "] " + log_message;
 
     if (log_destination_ == LogDestination::Terminal || log_destination_ == LogDestination::Both) {
@@ -45,14 +46,6 @@ void LogManager::log_message(LogLevel level, const char* format, ...) {
             rotate_log_files();
         }
     }
-}
-
-std::string LogManager::get_current_timestamp() {
-    time_t now = time(nullptr);
-    struct tm* time_info = localtime(&now);
-    char buffer[20];
-    strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", time_info);
-    return std::string(buffer);
 }
 
 void LogManager::rotate_log_files() {

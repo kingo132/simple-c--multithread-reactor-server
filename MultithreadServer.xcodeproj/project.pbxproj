@@ -20,20 +20,8 @@
 		96AB74592CC4A4DA00ECCE18 /* tcp_handler.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 96AB74562CC4A4DA00ECCE18 /* tcp_handler.cpp */; };
 		96AB745A2CC4A4DA00ECCE18 /* udp_handler.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 96AB74572CC4A4DA00ECCE18 /* udp_handler.cpp */; };
 		96AB745E2CC4A58000ECCE18 /* protocol_handler.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 96AB745B2CC4A58000ECCE18 /* protocol_handler.cpp */; };
-		96AB74602CC4D14400ECCE18 /* Makefile in Sources */ = {isa = PBXBuildFile; fileRef = 96AB745F2CC4D14400ECCE18 /* Makefile */; };
+		96F7E2F92CC5D0E20017FDA7 /* utility.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 96F7E2F72CC5D0E20017FDA7 /* utility.cpp */; };
 /* End PBXBuildFile section */
-
-/* Begin PBXCopyFilesBuildPhase section */
-		96AB74242CC434FC00ECCE18 /* CopyFiles */ = {
-			isa = PBXCopyFilesBuildPhase;
-			buildActionMask = 2147483647;
-			dstPath = /usr/share/man/man1/;
-			dstSubfolderSpec = 0;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 1;
-		};
-/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		96AB74262CC434FC00ECCE18 /* MultithreadServer */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = MultithreadServer; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -64,9 +52,11 @@
 		96AB745B2CC4A58000ECCE18 /* protocol_handler.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = protocol_handler.cpp; sourceTree = "<group>"; };
 		96AB745C2CC4A58000ECCE18 /* tcp_handler.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = tcp_handler.h; sourceTree = "<group>"; };
 		96AB745D2CC4A58000ECCE18 /* udp_handler.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = udp_handler.h; sourceTree = "<group>"; };
-		96AB745F2CC4D14400ECCE18 /* Makefile */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.make; path = Makefile; sourceTree = "<group>"; };
 		96B9C2CD2CC4DD3800C6143C /* LICENSE */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = LICENSE; sourceTree = "<group>"; };
 		96B9C2CE2CC4DD3800C6143C /* README.md */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
+		96F7E2F72CC5D0E20017FDA7 /* utility.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = utility.cpp; sourceTree = "<group>"; };
+		96F7E2F82CC5D0E20017FDA7 /* utility.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = utility.h; sourceTree = "<group>"; };
+		96F7E2FB2CC5E7410017FDA7 /* default_config.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = default_config.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -128,7 +118,9 @@
 				96AB745C2CC4A58000ECCE18 /* tcp_handler.h */,
 				96AB74572CC4A4DA00ECCE18 /* udp_handler.cpp */,
 				96AB745D2CC4A58000ECCE18 /* udp_handler.h */,
-				96AB745F2CC4D14400ECCE18 /* Makefile */,
+				96F7E2F72CC5D0E20017FDA7 /* utility.cpp */,
+				96F7E2F82CC5D0E20017FDA7 /* utility.h */,
+				96F7E2FB2CC5E7410017FDA7 /* default_config.h */,
 			);
 			path = MultithreadServer;
 			sourceTree = "<group>";
@@ -142,7 +134,6 @@
 			buildPhases = (
 				96AB74222CC434FC00ECCE18 /* Sources */,
 				96AB74232CC434FC00ECCE18 /* Frameworks */,
-				96AB74242CC434FC00ECCE18 /* CopyFiles */,
 			);
 			buildRules = (
 			);
@@ -196,13 +187,13 @@
 				96AB74512CC498D200ECCE18 /* daemon_manager.cpp in Sources */,
 				96AB745E2CC4A58000ECCE18 /* protocol_handler.cpp in Sources */,
 				96AB743A2CC436B000ECCE18 /* ring_queue.cpp in Sources */,
+				96F7E2F92CC5D0E20017FDA7 /* utility.cpp in Sources */,
 				96AB743E2CC43DB500ECCE18 /* client_manager.cpp in Sources */,
 				96AB74392CC436B000ECCE18 /* server.cpp in Sources */,
 				96AB74482CC4827600ECCE18 /* select_dispatcher.cpp in Sources */,
 				96AB74592CC4A4DA00ECCE18 /* tcp_handler.cpp in Sources */,
 				96AB74552CC4992A00ECCE18 /* dll_functions.cpp in Sources */,
 				96AB74532CC498D200ECCE18 /* log_manager.cpp in Sources */,
-				96AB74602CC4D14400ECCE18 /* Makefile in Sources */,
 				96AB742A2CC434FC00ECCE18 /* main.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

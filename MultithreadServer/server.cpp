@@ -1,4 +1,5 @@
 #include "server.h"
+
 #include <cstring>
 #include <fstream>
 #include <sstream>
@@ -7,6 +8,8 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 
+#include "configuration_manager.h"
+#include "default_config.h"
 #ifdef __linux__
 #include "epoll_dispatcher.h"
 #define USE_EPOLL
@@ -71,6 +74,14 @@ int Server::start(const std::string& bind_file) {
     if (create_server_sockets(bind_file) != 0) {
         return -1;
     }
+    
+    int max_pkt_size = ConfigurationManager::getInstance().get_integer("max_packet_size", DEFAULT_MAX_PACKET_SIZE);
+    if (max_pkt_size > DEFAULT_MAX_PACKET_SIZE) {
+        LOG_ERR("Max packet size %d exceed %d.", max_pkt_size, DEFAULT_MAX_PACKET_SIZE);
+        return -1;
+    }
+    recv_buffer_size_ = ConfigurationManager::getInstance().get_integer("recv_buffer", DEFAULT_RECV_BUFFER_SIZE);
+    send_buffer_size_ = ConfigurationManager::getInstance().get_integer("send_buffer", DEFAULT_SEND_BUFFER_SIZE);
 
     network_thread_ = std::thread(&Server::network_thread_func, this);
 
@@ -101,7 +112,10 @@ void Server::stop() {
 
 // Create server sockets based on bind file
 int Server::create_server_sockets(const std::string& bind_file) {
-    binds_ = parse_bind_file(bind_file);  // Store bind configurations
+    binds_ = parse_bind_file(bind_file);
+    if (binds_.empty()) {
+        return -1;
+    }
 
     for (const auto& bind_info : binds_) {
         int sock_type = (bind_info.flags & CN_UDP_MASK) ? SOCK_DGRAM : SOCK_STREAM;
@@ -129,9 +143,13 @@ int Server::create_server_sockets(const std::string& bind_file) {
         server_sockets_.push_back(socket_fd);
         socket_bind_map_[socket_fd] = bind_info;  // Map the socket to its bind info
         dispatcher_->add_fd(socket_fd);  // Add socket to the dispatcher
+        
+        LOG_INFO("Listen on %s:%d (type: %s, idle: %d, flag: %d)",
+                 bind_info.ip.c_str(), bind_info.port, bind_info.type.c_str(), bind_info.idle_timeout,
+                 bind_info.flags);
     }
 
-    LOG_INFO("Server started and listening on configured ports");
+    LOG_INFO("Server started!");
     return 0;
 }
 
@@ -147,36 +165,27 @@ ProtocolHandler* Server::get_protocol_handler(int flags) {
     }
 }
 
-// Handle accepting new TCP clients
-void Server::accept_client(int server_socket, int flags) {
-    sockaddr_in client_addr{};
-    socklen_t client_len = sizeof(client_addr);
-    int client_socket = accept(server_socket, (sockaddr*)&client_addr, &client_len);
-
-    if (client_socket >= 0) {
-        SocketInfo socket_info;
-        socket_info.sock_fd = client_socket;
-        socket_info.local_ip = ntohl(client_addr.sin_addr.s_addr);
-        socket_info.local_port = ntohs(client_addr.sin_port);
-
-        dll_functions_->handle_open(nullptr, nullptr, &socket_info);
-
-        // Add client to ClientManager
-        client_manager_.add_client(client_socket, socket_info, flags);
-        dispatcher_->add_fd(client_socket);  // Add client to event dispatcher
-        LOG_INFO("Accepted new TCP client on fd: %d", client_socket);
-    } else {
-        LOG_ERR("Failed to accept new client");
+void Server::close_client_connectio(SocketInfo* si) {
+    if (dll_functions_->handle_close) {
+        dll_functions_->handle_close(si);
     }
+    client_manager_.remove_client(si->sock_fd, dispatcher_);
+    dispatcher_->remove_fd(si->sock_fd);
+    close(si->sock_fd);
 }
 
 void Server::network_thread_func() {
+    if (dll_functions_->handle_init && dll_functions_->handle_init(saved_argc_, saved_argv_, (int) ThreadType::CONN) != 0) {
+        LOG_ERR("Network thread handle_init failed.");
+        return;
+    }
+    
     while (!stop_flag_.load(std::memory_order_acquire)) {
         dispatcher_->wait_and_handle_events([this](int fd, bool is_readable) {
             handle_client_data(fd, is_readable);
         });
 
-        char buffer[RECV_BUFFER_SIZE];
+        char buffer[DEFAULT_MAX_PACKET_SIZE];
         QueueBlock block;
         size_t actual_length;
 
@@ -184,7 +193,7 @@ void Server::network_thread_func() {
         if (send_queue_.wait_and_pop(buffer, sizeof(buffer), actual_length, block, std::chrono::milliseconds(100))) {
             ClientInfo* client = client_manager_.get_client(block.socket_info.sock_fd);
             if (!client) {
-                LOG_ERR("Failed to get client fd: %d", block.socket_info.sock_fd);
+                LOG_TRACE("Failed to get client fd: %d", block.socket_info.sock_fd);
                 continue;
             }
 
@@ -193,14 +202,13 @@ void Server::network_thread_func() {
                 if (block.type == BlockType::Data) {
                     int send_result = (int)protocol_handler->send_data(*client, buffer, actual_length);
                     if (send_result < 0) {
-                        LOG_ERR("Failed to send data to client fd: %d", block.socket_info.sock_fd);
+                        LOG_ERR("Failed to send data to client fd: %d, close conn.", block.socket_info.sock_fd);
+                        close_client_connectio(&client->socket_info);
                     }
                 } else if (block.type == BlockType::Final) {
                     if (client->send_len == 0) {
-                        dll_functions_->handle_close(&client->socket_info);
-                        client_manager_.remove_client(block.socket_info.sock_fd, dispatcher_);
-                        close(block.socket_info.sock_fd);
                         LOG_INFO("Connection closed for client fd: %d", block.socket_info.sock_fd);
+                        close_client_connectio(&client->socket_info);
                     } else {
                         client->pending_close = true;
                     }
@@ -209,28 +217,50 @@ void Server::network_thread_func() {
         }
 
         // Check for any pending closures
-        for (auto& client : client_manager_.get_all_clients()) {
-            if (client.second.pending_close && client.second.send_len == 0) {
-                dll_functions_->handle_close(&client.second.socket_info);
-                client_manager_.remove_client(client.first, dispatcher_);
-                close(client.first);
-                LOG_INFO("Connection finalized for client fd: %d", client.first);
+        for (auto& client_pair : client_manager_.get_all_clients()) {
+            ClientInfo& client = client_pair.second;
+            
+            // Send remaining data
+            ProtocolHandler* protocol_handler = get_protocol_handler(client.flag);
+            if (protocol_handler && client.send_len > 0) {
+                int send_result = (int)protocol_handler->send_data(client, nullptr, 0);
+                if (send_result < 0) {
+                    LOG_ERR("Failed to send remaining data to client fd: %d", client.socket_info.sock_fd);
+                    // Discard the remaining data
+                    client.send_len = 0;
+                    client.pending_close = true;
+                }
+            }
+
+            // Close connections
+            if (client.pending_close && client.send_len == 0) {
+                LOG_INFO("Connection finalized for client fd: %d, close it.", client.socket_info.sock_fd);
+                close_client_connectio(&client.socket_info);
             }
         }
+    }
+    
+    if (dll_functions_->handle_fini) {
+        dll_functions_->handle_fini((int) ThreadType::CONN);
     }
 }
 
 void Server::worker_thread_func(int worker_id) {
+    if (dll_functions_->handle_init && dll_functions_->handle_init(saved_argc_, saved_argv_, (int) ThreadType::WORK) != 0) {
+        LOG_ERR("Work thread handle_init failed.");
+        return;
+    }
+    
     while (!stop_flag_.load(std::memory_order_acquire)) {
-        char buffer[RECV_BUFFER_SIZE];
+        char buffer[DEFAULT_MAX_PACKET_SIZE];
         QueueBlock block;
         size_t actual_length;
 
         // Pop data from the receive queue to process
         if (recv_queue_.wait_and_pop(buffer, sizeof(buffer), actual_length, block, std::chrono::milliseconds(100))) {
-            char* send_data = nullptr;
+            char send_buffer[DEFAULT_MAX_PACKET_SIZE];
+            char* send_data = send_buffer;
             int send_data_len = 0;
-
             int result = dll_functions_->handle_process(buffer, (int)actual_length, &send_data, &send_data_len, &block.socket_info);
 
             if (result >= 0 && send_data != nullptr) {
@@ -242,7 +272,7 @@ void Server::worker_thread_func(int worker_id) {
 
                 // Push processed data to the send queue
                 send_queue_.push(send_data, send_data_len, response_block);
-                LOG_DEBUG("Processed data for client fd: %d", block.socket_info.sock_fd);
+                LOG_TRACE("Processed data for client fd: %d", block.socket_info.sock_fd);
             }
 
             if (result < 0) {
@@ -256,6 +286,10 @@ void Server::worker_thread_func(int worker_id) {
             }
         }
     }
+    
+    if (dll_functions_->handle_fini) {
+        dll_functions_->handle_fini((int) ThreadType::WORK);
+    }
 }
 
 // Handle client data, including accepting new connections for TCP
@@ -266,7 +300,7 @@ void Server::handle_client_data(int fd, bool is_readable) {
         // Use appropriate protocol handler to manage the connection
         ProtocolHandler* protocol_handler = get_protocol_handler(bind_info_it->second.flags);
         if (protocol_handler) {
-            protocol_handler->accept_client(fd, client_manager_, dispatcher_, dll_functions_);
+            protocol_handler->accept_client(fd, client_manager_, dispatcher_, dll_functions_, recv_buffer_size_, send_buffer_size_);
         } else {
             LOG_CRIT("Unsupported protocol for socket fd: %d", fd);
         }
@@ -282,18 +316,10 @@ void Server::handle_client_data(int fd, bool is_readable) {
 
     ProtocolHandler* protocol_handler = get_protocol_handler(client->flag);
     if (protocol_handler && is_readable) {
-        int recv_result = (int) protocol_handler->receive_data(*client, dll_functions_);
+        int recv_result = (int) protocol_handler->receive_data(*client, dll_functions_, recv_queue_);
         if (recv_result < 0) {
-            LOG_ERR("Failed to receive data from client fd: %d", fd);
-        } else {
-            // Push received data to the receive queue for workers to process
-            QueueBlock recv_block;
-            recv_block.accept_fd = client->socket_info.sock_fd;
-            recv_block.socket_info = client->socket_info;
-            recv_block.type = BlockType::Data;
-            recv_block.total_length = recv_result;
-
-            recv_queue_.push(client->recv_buffer, recv_result, recv_block);
+            LOG_ERR("Failed to receive data from client fd: %d, close connection.", fd);
+            close_client_connectio(&client->socket_info);
         }
     }
 }

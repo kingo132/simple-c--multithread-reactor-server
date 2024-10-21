@@ -8,14 +8,14 @@
 
 enum class LogLevel {
     Emergency = 0,
-    Alert,
-    Critical,
-    Error,
-    Warning,
-    Notice,
-    Info,
-    Debug,
-    Trace
+    Alert, // 1
+    Critical, // 2
+    Error, // 3
+    Warning, // 4
+    Notice, // 5
+    Info, // 6
+    Debug, // 7
+    Trace // 8
 };
 
 enum class LogDestination {
@@ -33,7 +33,6 @@ public:
     void log_message(LogLevel level, const char* format, ...);
 
 private:
-    std::string get_current_timestamp();
     void rotate_log_files();
 
     std::string log_directory_;

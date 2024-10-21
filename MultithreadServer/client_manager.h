@@ -6,9 +6,6 @@
 #include "socket_info.h"
 #include "event_dispatcher.h"
 
-// Buffer sizes
-constexpr size_t RECV_BUFFER_SIZE = 4096;
-
 // Connection flags
 constexpr uint32_t CN_VALID_MASK   = 0x01;
 constexpr uint32_t CN_LISTEN_MASK  = 0x04;
@@ -19,8 +16,10 @@ constexpr uint32_t CN_FINALIZE     = 0x20;
 // Represents client connection information, including buffers and connection flags
 struct ClientInfo {
     SocketInfo socket_info;      // Socket-related information (IP, port, etc.)
-    char recv_buffer[RECV_BUFFER_SIZE];  // Buffer to hold incoming data
-    char send_buffer[RECV_BUFFER_SIZE];  // Buffer to hold outgoing data
+    char* recv_buffer;  // Buffer to hold incoming data
+    char* send_buffer;  // Buffer to hold outgoing data
+    size_t recv_buffer_size;
+    size_t send_buffer_size;
     size_t recv_len;             // Length of valid data in receive buffer
     size_t send_len;             // Length of valid data in send buffer
     bool pending_close;          // Flag to mark if the connection should be closed
@@ -37,7 +36,7 @@ struct ClientInfo {
 class ClientManager {
 public:
     // Add a client
-    void add_client(int client_fd, const SocketInfo& socket_info, uint32_t flags);
+    ClientInfo* add_client(int client_fd, const SocketInfo& socket_info, uint32_t flags, size_t recv_buffer_size, size_t send_buffer_size);
 
     // Remove a client
     void remove_client(int client_fd, EventDispatcher* dispatcher);

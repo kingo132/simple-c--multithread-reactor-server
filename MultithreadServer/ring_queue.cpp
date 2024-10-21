@@ -1,12 +1,14 @@
 #include "ring_queue.h"
 #include <cstring>  // for memcpy
 #include <cstdlib>  // for malloc and free
+#include "log_manager.h"
 
 RingQueue::RingQueue(size_t buffer_size)
     : buffer_size_(buffer_size), padding_enabled_(false) {
     buffer_ = (char*)malloc(buffer_size_);
     write_index_ = 0;
     read_index_ = 0;
+    LOG_INFO("Initialize ring queue size: %d.", buffer_size_);
 }
 
 RingQueue::~RingQueue() {
@@ -42,6 +44,7 @@ bool RingQueue::push(const char* data, size_t length, const QueueBlock& block_he
     size_t total_length = length + sizeof(QueueBlock);
 
     if (total_length > buffer_size_) {
+        LOG_ERR("Block size %d exceeds the entire buffer %d.", total_length, buffer_size_);
         return false;  // Block size exceeds the entire buffer
     }
 
@@ -50,6 +53,7 @@ bool RingQueue::push(const char* data, size_t length, const QueueBlock& block_he
 
     // Check if there is enough free space
     if (free_space < total_length) {
+        LOG_ERR("Not engouth free space %d < %d.", free_space, total_length);
         return false;  // Not enough free space
     }
 
@@ -105,6 +109,7 @@ bool RingQueue::wait_and_pop(char* data, size_t max_buffer_size, size_t& actual_
                 actual_length = block_header.total_length - sizeof(QueueBlock);
 
                 if (actual_length > max_buffer_size) {
+                    LOG_ERR("ring queue buffer size %d not enough, need %d.", max_buffer_size, actual_length);
                     return false;  // The provided buffer is not large enough
                 }
 

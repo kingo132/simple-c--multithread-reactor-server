@@ -13,6 +13,12 @@
 #include "log_manager.h"
 #include "protocol_handler.h"
 
+enum class ThreadType {
+    MAIN = 0,
+    CONN,
+    WORK
+};
+
 struct BindInfo {
     std::string ip;
     int port;
@@ -29,6 +35,12 @@ public:
     // Start and stop the server
     int start(const std::string& bind_file);
     void stop();
+    
+    void close_client_connectio(SocketInfo* si);
+    void save_argc_argv(int argc, char** argv) {
+        saved_argc_ = argc;
+        saved_argv_ = argv;
+    }
 
 private:
     RingQueue recv_queue_; // Receive queue (network thread -> worker threads)
@@ -43,6 +55,10 @@ private:
     dll_func_t* dll_functions_; // DLL function pointers
     ClientManager client_manager_; // Manages client connections
     EventDispatcher* dispatcher_; // Event dispatcher (epoll/select)
+    ssize_t recv_buffer_size_;
+    ssize_t send_buffer_size_;
+    int saved_argc_;
+    char** saved_argv_;
 
     // Create and bind server sockets based on configuration
     int create_server_sockets(const std::string& bind_file);
@@ -58,9 +74,6 @@ private:
 
     // Handle client data, including new connections and data transmission
     void handle_client_data(int fd, bool is_readable);
-
-    // Accept new TCP client connections
-    void accept_client(int server_socket, int flags);
 };
 
 #endif // SERVER_H

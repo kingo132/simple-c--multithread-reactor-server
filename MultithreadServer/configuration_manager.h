@@ -6,6 +6,8 @@
 
 class ConfigurationManager {
 public:
+    static ConfigurationManager& getInstance();
+    
     // Loads configuration from a file
     bool load_configuration(const std::string& file_path);
 

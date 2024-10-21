@@ -5,6 +5,7 @@
 #include <sys/resource.h>
 #include <cstring>
 #include <iostream>
+#include "utility.h"
 
 volatile int stop_signal = 0;
 volatile int restart_signal = 0;
@@ -35,13 +36,13 @@ int start_daemon(int argc, char** argv) {
         return -1;
     }
 #else
-    std::cerr << "Warning: Daemonization is not supported on macOS. Running in foreground." << std::endl;
+    std::cerr << "[" + Utility::get_current_timestamp_string() + "] Warning: Daemonization is not supported on macOS. Running in foreground." << std::endl;
 #endif
 
     return 0;
 }
 
 void stop_daemon() {
-    std::cout << "Stopping server..." << std::endl;
+    std::cout << "[" + Utility::get_current_timestamp_string() + "] Stopping server..." << std::endl;
 }
 

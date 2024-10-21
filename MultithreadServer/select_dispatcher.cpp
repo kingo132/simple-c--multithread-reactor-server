@@ -1,4 +1,5 @@
 #include "select_dispatcher.h"
+#include "log_manager.h"
 
 SelectDispatcher::SelectDispatcher() {
     FD_ZERO(&read_fds_);
@@ -21,6 +22,7 @@ void SelectDispatcher::wait_and_handle_events(const std::function<void(int fd, b
     timeval timeout{};
     timeout.tv_sec = 1;
 
+    //LOG_TRACE("select wait for event.");
     int activity = select(max_fd_ + 1, &temp_fds, nullptr, nullptr, &timeout);
     if (activity > 0) {
         for (int i = 0; i <= max_fd_; ++i) {
