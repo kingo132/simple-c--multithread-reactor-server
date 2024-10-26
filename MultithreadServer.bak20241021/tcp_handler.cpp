@@ -13,8 +13,6 @@ void TcpHandler::accept_client(int server_fd, ClientManager& client_manager, Eve
     int client_fd = accept(server_fd, (sockaddr*)&client_addr, &client_len);
 
     if (client_fd >= 0) {
-        // TODO: set client_fd to non block
-        
         SocketInfo socket_info;
         socket_info.sock_fd = client_fd;
         socket_info.local_ip = ntohl(client_addr.sin_addr.s_addr);

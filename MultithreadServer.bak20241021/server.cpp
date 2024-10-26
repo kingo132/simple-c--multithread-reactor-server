@@ -124,8 +124,6 @@ int Server::create_server_sockets(const std::string& bind_file) {
             LOG_CRIT("Failed to create server socket for %s:%d", bind_info.ip.c_str(), bind_info.port);
             return -1;
         }
-        
-        // TODO: set socket to non block
 
         sockaddr_in server_addr{};
         server_addr.sin_family = AF_INET;
